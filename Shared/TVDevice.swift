@@ -25,14 +25,24 @@ public enum TVStore {
 
     public static var defaults: UserDefaults { .standard }
 
+    /// TVs (including webOS pairing keys) live in the Keychain so they survive
+    /// reinstalls and new builds — UserDefaults is wiped when a differently-signed
+    /// build replaces the app, which forced re-pairing on every install.
     public static func loadTVs() -> [TVDevice] {
+        if let data = KeychainStore.read(key: tvsKey),
+           let tvs = try? JSONDecoder().decode([TVDevice].self, from: data) {
+            return tvs
+        }
+        // Migrate from the old UserDefaults storage.
         guard let data = defaults.data(forKey: tvsKey),
               let tvs = try? JSONDecoder().decode([TVDevice].self, from: data) else { return [] }
+        saveTVs(tvs)
         return tvs
     }
 
     public static func saveTVs(_ tvs: [TVDevice]) {
         guard let data = try? JSONEncoder().encode(tvs) else { return }
+        KeychainStore.write(key: tvsKey, data: data)
         defaults.set(data, forKey: tvsKey)
     }
 
