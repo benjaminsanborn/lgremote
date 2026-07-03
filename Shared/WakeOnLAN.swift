@@ -19,18 +19,27 @@ public enum WakeOnLAN {
             lastReport = ["invalid MAC \(macAddress)"]
             return false
         }
-        var targets = broadcastAddresses()
-        if let unicastHost { targets.append(unicastHost) }
+        // (address, interface to bind, broadcast). The global broadcast MUST be
+        // bound to a specific interface — an unbound sendto 255.255.255.255
+        // fails with EHOSTUNREACH on iOS.
+        var sends: [(address: String, interface: String?, broadcast: Bool)] = []
+        for interface in broadcastInterfaces() {
+            sends.append((interface.broadcast, nil, true))
+            sends.append(("255.255.255.255", interface.name, true))
+        }
+        if let unicastHost { sends.append((unicastHost, nil, false)) }
+
         var delivered = false
         var report: [String] = []
         for round in 0..<3 {
-            for target in targets {
-                let isBroadcast = target.hasSuffix(".255") || target == "255.255.255.255"
+            for target in sends {
                 for port in [UInt16(9), UInt16(7)] {
-                    let result = send(packet, to: target, port: port, broadcast: isBroadcast)
+                    let result = send(packet, to: target.address, port: port,
+                                      broadcast: target.broadcast, interface: target.interface)
                     if result == nil { delivered = true }
                     if round == 0 {
-                        report.append("\(target):\(port) \(result ?? "ok")")
+                        let via = target.interface.map { "@\($0)" } ?? ""
+                        report.append("\(target.address)\(via):\(port) \(result ?? "ok")")
                     }
                 }
             }
@@ -39,12 +48,17 @@ public enum WakeOnLAN {
         return delivered
     }
 
-    /// The IPv4 broadcast addresses of the device's active interfaces, plus the
-    /// global broadcast address.
-    static func broadcastAddresses() -> [String] {
-        var addresses: Set<String> = ["255.255.255.255"]
+    struct BroadcastInterface {
+        let name: String
+        let broadcast: String
+    }
+
+    /// The device's active broadcast-capable IPv4 interfaces (e.g. Wi-Fi "en0")
+    /// with their subnet broadcast addresses.
+    static func broadcastInterfaces() -> [BroadcastInterface] {
+        var result: [BroadcastInterface] = []
         var first: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&first) == 0 else { return Array(addresses) }
+        guard getifaddrs(&first) == 0 else { return result }
         defer { freeifaddrs(first) }
         var pointer = first
         while let interface = pointer?.pointee {
@@ -58,10 +72,11 @@ public enum WakeOnLAN {
             var buffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
             var sin = addr.sin_addr
             if inet_ntop(AF_INET, &sin, &buffer, socklen_t(INET_ADDRSTRLEN)) != nil {
-                addresses.insert(String(cString: buffer))
+                result.append(BroadcastInterface(name: String(cString: interface.ifa_name),
+                                                 broadcast: String(cString: buffer)))
             }
         }
-        return Array(addresses)
+        return result
     }
 
     static func magicPacket(for macAddress: String) -> Data? {
@@ -84,7 +99,8 @@ public enum WakeOnLAN {
     }
 
     /// Returns nil on success, or a short error description.
-    private static func send(_ data: Data, to address: String, port: UInt16 = 9, broadcast: Bool) -> String? {
+    private static func send(_ data: Data, to address: String, port: UInt16 = 9,
+                             broadcast: Bool, interface: String? = nil) -> String? {
         let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         guard fd >= 0 else { return "socket errno \(errno)" }
         defer { close(fd) }
@@ -93,6 +109,14 @@ public enum WakeOnLAN {
             var enable: Int32 = 1
             if setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &enable, socklen_t(MemoryLayout<Int32>.size)) != 0 {
                 return "SO_BROADCAST errno \(errno)"
+            }
+        }
+
+        if let interface {
+            var index = if_nametoindex(interface)
+            guard index != 0 else { return "no interface \(interface)" }
+            if setsockopt(fd, IPPROTO_IP, IP_BOUND_IF, &index, socklen_t(MemoryLayout<UInt32>.size)) != 0 {
+                return "IP_BOUND_IF errno \(errno)"
             }
         }
 
