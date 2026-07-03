@@ -208,7 +208,8 @@ final class RemoteViewModel: ObservableObject {
                 if Task.isCancelled { return }
             }
             state = .disconnected
-            errorMessage = "Couldn't reach \"\(tv.name)\". Make sure the TV is plugged in, on the same network, and has \"Turn on via Wi-Fi\" (Quick Start+) enabled in its settings."
+            let report = WakeOnLAN.lastReport.joined(separator: "\n")
+            errorMessage = "Couldn't reach \"\(tv.name)\". Make sure the TV is plugged in, on the same network, and has \"Turn on via Wi-Fi\" (Quick Start+) enabled in its settings.\n\nWake packet log:\n\(report)"
         }
     }
 

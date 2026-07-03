@@ -9,20 +9,33 @@ public enum WakeOnLAN {
     /// packet is dropped once the sleeping TV's ARP entry expires, so the subnet
     /// broadcast is the one that reliably reaches a deep-sleeping TV. Sent on both
     /// common WoL ports (9 and 7).
+    /// Per-target result of the most recent wake() call, e.g.
+    /// "192.168.1.255:9 ok" or "255.255.255.255:9 errno 1 (EPERM)".
+    public private(set) static var lastReport: [String] = []
+
     @discardableResult
     public static func wake(macAddress: String, unicastHost: String? = nil) -> Bool {
-        guard let packet = magicPacket(for: macAddress) else { return false }
+        guard let packet = magicPacket(for: macAddress) else {
+            lastReport = ["invalid MAC \(macAddress)"]
+            return false
+        }
         var targets = broadcastAddresses()
         if let unicastHost { targets.append(unicastHost) }
         var delivered = false
-        for _ in 0..<3 {
+        var report: [String] = []
+        for round in 0..<3 {
             for target in targets {
                 let isBroadcast = target.hasSuffix(".255") || target == "255.255.255.255"
                 for port in [UInt16(9), UInt16(7)] {
-                    if send(packet, to: target, port: port, broadcast: isBroadcast) { delivered = true }
+                    let result = send(packet, to: target, port: port, broadcast: isBroadcast)
+                    if result == nil { delivered = true }
+                    if round == 0 {
+                        report.append("\(target):\(port) \(result ?? "ok")")
+                    }
                 }
             }
         }
+        lastReport = report
         return delivered
     }
 
@@ -70,21 +83,25 @@ public enum WakeOnLAN {
         return packet
     }
 
-    private static func send(_ data: Data, to address: String, port: UInt16 = 9, broadcast: Bool) -> Bool {
+    /// Returns nil on success, or a short error description.
+    private static func send(_ data: Data, to address: String, port: UInt16 = 9, broadcast: Bool) -> String? {
         let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
-        guard fd >= 0 else { return false }
+        guard fd >= 0 else { return "socket errno \(errno)" }
         defer { close(fd) }
 
         if broadcast {
             var enable: Int32 = 1
-            setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &enable, socklen_t(MemoryLayout<Int32>.size))
+            if setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &enable, socklen_t(MemoryLayout<Int32>.size)) != 0 {
+                return "SO_BROADCAST errno \(errno)"
+            }
         }
 
         var addr = sockaddr_in()
         addr.sin_family = sa_family_t(AF_INET)
         addr.sin_port = port.bigEndian
-        addr.sin_addr.s_addr = inet_addr(address)
-        guard addr.sin_addr.s_addr != INADDR_NONE else { return false }
+        // inet_pton, not inet_addr: inet_addr("255.255.255.255") == INADDR_NONE,
+        // so the error check would reject the global broadcast address itself.
+        guard inet_pton(AF_INET, address, &addr.sin_addr) == 1 else { return "bad address" }
 
         let sent = data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> Int in
             withUnsafePointer(to: addr) { pointer in
@@ -93,6 +110,7 @@ public enum WakeOnLAN {
                 }
             }
         }
-        return sent == data.count
+        if sent == data.count { return nil }
+        return "sendto errno \(errno) (\(String(cString: strerror(errno))))"
     }
 }
