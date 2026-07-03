@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# XcodeGen output — regenerate with `xcodegen generate`
+LGRemote.xcodeproj/
