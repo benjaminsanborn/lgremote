@@ -22,12 +22,12 @@ public enum WakeOnLAN {
         // (address, interface to bind, broadcast). The global broadcast MUST be
         // bound to a specific interface — an unbound sendto 255.255.255.255
         // fails with EHOSTUNREACH on iOS.
-        var sends: [(address: String, interface: String?, broadcast: Bool)] = []
+        var sends: [(address: String, interface: String?, localAddress: String?, broadcast: Bool)] = []
         for interface in broadcastInterfaces() {
-            sends.append((interface.broadcast, nil, true))
-            sends.append(("255.255.255.255", interface.name, true))
+            sends.append((interface.broadcast, nil, nil, true))
+            sends.append(("255.255.255.255", interface.name, interface.localAddress, true))
         }
-        if let unicastHost { sends.append((unicastHost, nil, false)) }
+        if let unicastHost { sends.append((unicastHost, nil, nil, false)) }
 
         var delivered = false
         var report: [String] = []
@@ -35,7 +35,8 @@ public enum WakeOnLAN {
             for target in sends {
                 for port in [UInt16(9), UInt16(7)] {
                     let result = send(packet, to: target.address, port: port,
-                                      broadcast: target.broadcast, interface: target.interface)
+                                      broadcast: target.broadcast, interface: target.interface,
+                                      localAddress: target.localAddress)
                     if result == nil { delivered = true }
                     if round == 0 {
                         let via = target.interface.map { "@\($0)" } ?? ""
@@ -51,6 +52,7 @@ public enum WakeOnLAN {
     struct BroadcastInterface {
         let name: String
         let broadcast: String
+        let localAddress: String
     }
 
     /// The device's active broadcast-capable IPv4 interfaces (e.g. Wi-Fi "en0")
@@ -66,14 +68,21 @@ public enum WakeOnLAN {
             guard (Int32(interface.ifa_flags) & IFF_BROADCAST) != 0,
                   (Int32(interface.ifa_flags) & IFF_UP) != 0,
                   let broadcast = interface.ifa_dstaddr,
-                  broadcast.pointee.sa_family == sa_family_t(AF_INET) else { continue }
-            var addr = sockaddr_in()
-            memcpy(&addr, broadcast, MemoryLayout<sockaddr_in>.size)
-            var buffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
-            var sin = addr.sin_addr
-            if inet_ntop(AF_INET, &sin, &buffer, socklen_t(INET_ADDRSTRLEN)) != nil {
+                  broadcast.pointee.sa_family == sa_family_t(AF_INET),
+                  let local = interface.ifa_addr,
+                  local.pointee.sa_family == sa_family_t(AF_INET) else { continue }
+            func string(from sockaddr: UnsafeMutablePointer<sockaddr>) -> String? {
+                var addr = sockaddr_in()
+                memcpy(&addr, sockaddr, MemoryLayout<sockaddr_in>.size)
+                var buffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+                var sin = addr.sin_addr
+                guard inet_ntop(AF_INET, &sin, &buffer, socklen_t(INET_ADDRSTRLEN)) != nil else { return nil }
+                return String(cString: buffer)
+            }
+            if let broadcastString = string(from: broadcast), let localString = string(from: local) {
                 result.append(BroadcastInterface(name: String(cString: interface.ifa_name),
-                                                 broadcast: String(cString: buffer)))
+                                                 broadcast: broadcastString,
+                                                 localAddress: localString))
             }
         }
         return result
@@ -100,7 +109,7 @@ public enum WakeOnLAN {
 
     /// Returns nil on success, or a short error description.
     private static func send(_ data: Data, to address: String, port: UInt16 = 9,
-                             broadcast: Bool, interface: String? = nil) -> String? {
+                             broadcast: Bool, interface: String? = nil, localAddress: String? = nil) -> String? {
         let fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         guard fd >= 0 else { return "socket errno \(errno)" }
         defer { close(fd) }
@@ -118,6 +127,21 @@ public enum WakeOnLAN {
             if setsockopt(fd, IPPROTO_IP, IP_BOUND_IF, &index, socklen_t(MemoryLayout<UInt32>.size)) != 0 {
                 return "IP_BOUND_IF errno \(errno)"
             }
+        }
+
+        // Global broadcast also needs the socket bound to the interface's own
+        // address, or the kernel can't pick a source and fails with EHOSTUNREACH.
+        if let localAddress {
+            var local = sockaddr_in()
+            local.sin_family = sa_family_t(AF_INET)
+            local.sin_port = 0
+            guard inet_pton(AF_INET, localAddress, &local.sin_addr) == 1 else { return "bad local address" }
+            let bound = withUnsafePointer(to: local) { pointer in
+                pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPointer in
+                    bind(fd, sockaddrPointer, socklen_t(MemoryLayout<sockaddr_in>.size))
+                }
+            }
+            if bound != 0 { return "bind errno \(errno)" }
         }
 
         var addr = sockaddr_in()
