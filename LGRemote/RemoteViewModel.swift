@@ -30,9 +30,6 @@ final class RemoteViewModel: ObservableObject {
     @Published var showPicker = false
     /// Live per-TV power status from probing the webOS port. Missing = unknown.
     @Published var awake: [UUID: Bool] = [:]
-    /// Whether the connected TV's panel is actually on ("Active" power state) —
-    /// a TV in Quick Start+ standby stays connectable with the screen off.
-    @Published var tvIsOn: Bool?
 
     private let client = WebOSClient()
     private var connectTask: Task<Void, Never>?
@@ -144,7 +141,6 @@ final class RemoteViewModel: ObservableObject {
                     WakeOnLAN.wake(macAddress: mac, unicastHost: updated.host)
                 }
             }
-            tvIsOn = (try? await client.powerState()).map { $0 == "Active" } ?? true
 
             inputs = (try? await client.listInputs()) ?? []
             apps = ((try? await client.listApps()) ?? []).sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
@@ -192,8 +188,7 @@ final class RemoteViewModel: ObservableObject {
         }
     }
 
-    /// Probes every saved TV so the picker can show live power status, and
-    /// refreshes the connected TV's panel state for the power pill.
+    /// Probes every saved TV so the picker can show live power status.
     func refreshStatuses() {
         for tv in tvs {
             Task {
@@ -201,22 +196,6 @@ final class RemoteViewModel: ObservableObject {
                 awake[tv.id] = isAwake
             }
         }
-        if state == .connected {
-            let client = client
-            Task {
-                if let power = try? await client.powerState() {
-                    tvIsOn = power == "Active"
-                }
-            }
-        }
-    }
-
-    /// TV power for the header pill: real panel state when connected, the
-    /// port probe otherwise. nil = unknown.
-    var selectedTVIsOn: Bool? {
-        if state == .connected { return tvIsOn ?? true }
-        guard let tv = selectedTV else { return nil }
-        return awake[tv.id]
     }
 
     /// Selects the TV, wakes it if it's asleep (Wake-on-LAN + retry until its
@@ -302,7 +281,6 @@ final class RemoteViewModel: ObservableObject {
                     await client.disconnect()
                     state = .disconnected
                     awake[tv.id] = false
-                    tvIsOn = false
                     return
                 } catch {
                     // Fall through and try waking instead.

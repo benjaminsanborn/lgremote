@@ -4,8 +4,6 @@ struct RemoteView: View {
     @EnvironmentObject private var viewModel: RemoteViewModel
     @State private var showNumberPad = false
 
-    private let statusTimer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
-
     var body: some View {
         VStack(spacing: 14) {
             header
@@ -34,7 +32,6 @@ struct RemoteView: View {
                 .presentationDetents([.height(360)])
                 .presentationBackground(.ultraThinMaterial)
         }
-        .onReceive(statusTimer) { _ in viewModel.refreshStatuses() }
     }
 
     // MARK: Header
@@ -71,8 +68,6 @@ struct RemoteView: View {
 
             Spacer()
 
-            powerPill
-
             Button {
                 Haptics.tap()
                 if viewModel.state == .connected {
@@ -94,8 +89,8 @@ struct RemoteView: View {
 
     private var connectionIcon: String {
         switch viewModel.state {
-        case .connected, .connecting, .pairing: return "wifi"
-        case .disconnected: return "wifi.slash"
+        case .connected, .connecting, .pairing: return "antenna.radiowaves.left.and.right"
+        case .disconnected: return "antenna.radiowaves.left.and.right.slash"
         }
     }
 
@@ -105,22 +100,6 @@ struct RemoteView: View {
         case .connecting, .pairing: return .orange
         case .disconnected: return .red
         }
-    }
-
-    private var powerPill: some View {
-        let isOn = viewModel.selectedTVIsOn
-        let label = isOn.map { $0 ? "On" : "Off" } ?? "—"
-        let color: Color = isOn == true ? .green : .secondary
-        return HStack(spacing: 5) {
-            Image(systemName: "power")
-                .font(.caption2.bold())
-            Text(label)
-                .font(.caption)
-        }
-        .foregroundStyle(color)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(.white.opacity(0.06)))
     }
 
     private var pairingBanner: some View {
