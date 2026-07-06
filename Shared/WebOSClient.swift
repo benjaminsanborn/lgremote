@@ -154,6 +154,13 @@ final class WebSocketConnection: NSObject, URLSessionWebSocketDelegate, @uncheck
 public actor WebOSClient {
     public private(set) var isConnected = false
 
+    /// Fired when the control socket drops unexpectedly (not on explicit disconnect).
+    private var onUnexpectedDisconnect: (@Sendable () -> Void)?
+
+    public func setOnUnexpectedDisconnect(_ handler: @escaping @Sendable () -> Void) {
+        onUnexpectedDisconnect = handler
+    }
+
     private var control: WebSocketConnection?
     private var pointer: WebSocketConnection?
     private var pending: [String: CheckedContinuation<[String: Any], Error>] = [:]
@@ -206,11 +213,13 @@ public actor WebOSClient {
     }
 
     private func connectionLost() {
+        let wasConnected = isConnected
         isConnected = false
         pointer?.close()
         pointer = nil
         control = nil
         failEverything(with: WebOSError.notConnected)
+        if wasConnected { onUnexpectedDisconnect?() }
     }
 
     private func failEverything(with error: Error) {

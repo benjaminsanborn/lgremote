@@ -43,6 +43,19 @@ final class RemoteViewModel: ObservableObject {
         if selectedID == nil { selectedID = tvs.first?.id }
         if tvs.isEmpty { showSetup = true }
         showPicker = !tvs.isEmpty
+        let client = client
+        Task {
+            await client.setOnUnexpectedDisconnect { [weak self] in
+                Task { @MainActor [weak self] in self?.socketDropped() }
+            }
+        }
+    }
+
+    /// The control socket died (TV powered off, app was suspended, network blip).
+    /// Optimistically try to get back — if the TV is gone the attempt just times out.
+    private func socketDropped() {
+        guard state == .connected else { return }
+        connect()
     }
 
     private func persist() {
@@ -150,7 +163,29 @@ final class RemoteViewModel: ObservableObject {
     }
 
     func connectIfNeeded() {
-        if state == .disconnected, selectedTV != nil { connect() }
+        guard selectedTV != nil else { return }
+        switch state {
+        case .disconnected:
+            connect()
+        case .connected:
+            // The socket may have silently died while the app was suspended —
+            // verify with a cheap request and reconnect if it's actually dead.
+            let client = client
+            Task {
+                if await client.isConnected == false {
+                    connect()
+                    return
+                }
+                do {
+                    _ = try await client.request("ssap://com.webos.service.tvpower/power/getPowerState", timeout: 3)
+                } catch {
+                    guard state == .connected else { return }
+                    connect()
+                }
+            }
+        case .connecting, .pairing:
+            break
+        }
     }
 
     /// Probes every saved TV so the picker can show live power status.
@@ -215,7 +250,8 @@ final class RemoteViewModel: ObservableObject {
 
     // MARK: Commands
 
-    /// Runs a command, surfacing errors and dropping to `.disconnected` if the socket died.
+    /// Runs a command, surfacing errors. If the socket died, optimistically
+    /// reconnects instead of leaving the remote stuck on "Not Connected".
     func run(_ operation: @escaping @Sendable (WebOSClient) async throws -> Void) {
         let client = client
         Task {
@@ -223,7 +259,8 @@ final class RemoteViewModel: ObservableObject {
                 try await operation(client)
             } catch {
                 if await client.isConnected == false {
-                    state = .disconnected
+                    // Reconnect unless an attempt is already in flight.
+                    if state == .connected || state == .disconnected { connect() }
                 } else {
                     errorMessage = error.localizedDescription
                 }
