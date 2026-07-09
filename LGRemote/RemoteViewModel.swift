@@ -73,7 +73,7 @@ final class RemoteViewModel: ObservableObject {
 
     func addTV(name: String, host: String, mac: String?) {
         let trimmedMAC = mac?.trimmingCharacters(in: .whitespaces)
-        let tv = TVDevice(name: name.isEmpty ? "LG TV" : name,
+        let tv = TVDevice(name: name.isEmpty ? "My TV" : name,
                           host: host.trimmingCharacters(in: .whitespaces),
                           macAddress: (trimmedMAC?.isEmpty ?? true) ? nil : trimmedMAC)
         tvs.append(tv)

@@ -36,7 +36,7 @@ struct ContentView: View {
             .sheet(isPresented: $viewModel.showSetup) {
                 SetupView()
             }
-            .alert("LG Remote", isPresented: Binding(
+            .alert("TV Remote", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
             )) {
