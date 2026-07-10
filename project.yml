@@ -27,10 +27,9 @@ targets:
         # iPhone only — project-level TARGETED_DEVICE_FAMILY doesn't stick on the
         # target, and shipping [1,2] makes App Store Connect demand iPad screenshots.
         TARGETED_DEVICE_FAMILY: "1"
-        # Uncomment once Apple grants the multicast entitlement (required for the
-        # Wake-on-LAN broadcast that wakes a deep-sleeping TV; requested 2026-07-03).
-        # Signing fails if enabled before the App ID has the capability.
-        # CODE_SIGN_ENTITLEMENTS: LGRemote/LGRemote.entitlements
+        # Multicast entitlement (granted by Apple 2026-07-10) — required for the
+        # Wake-on-LAN broadcast that wakes a deep-sleeping TV.
+        CODE_SIGN_ENTITLEMENTS: LGRemote/LGRemote.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     info:
