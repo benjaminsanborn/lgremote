@@ -15,8 +15,16 @@ public enum WakeOnLAN {
 
     @discardableResult
     public static func wake(macAddress: String, unicastHost: String? = nil) -> Bool {
-        guard let packet = magicPacket(for: macAddress) else {
-            lastReport = ["invalid MAC \(macAddress)"]
+        wake(macAddresses: [macAddress], unicastHost: unicastHost)
+    }
+
+    /// Sends magic packets for every given MAC (a packet addressed to an
+    /// inactive interface is harmless, so callers pass all known MACs).
+    @discardableResult
+    public static func wake(macAddresses: [String], unicastHost: String? = nil) -> Bool {
+        let packets = macAddresses.compactMap { mac in magicPacket(for: mac).map { (mac, $0) } }
+        guard !packets.isEmpty else {
+            lastReport = ["no valid MAC in \(macAddresses)"]
             return false
         }
         // (address, interface to bind, broadcast). The global broadcast MUST be
@@ -32,15 +40,17 @@ public enum WakeOnLAN {
         var delivered = false
         var report: [String] = []
         for round in 0..<3 {
-            for target in sends {
-                for port in [UInt16(9), UInt16(7)] {
-                    let result = send(packet, to: target.address, port: port,
-                                      broadcast: target.broadcast, interface: target.interface,
-                                      localAddress: target.localAddress)
-                    if result == nil { delivered = true }
-                    if round == 0 {
-                        let via = target.interface.map { "@\($0)" } ?? ""
-                        report.append("\(target.address)\(via):\(port) \(result ?? "ok")")
+            for (mac, packet) in packets {
+                for target in sends {
+                    for port in [UInt16(9), UInt16(7)] {
+                        let result = send(packet, to: target.address, port: port,
+                                          broadcast: target.broadcast, interface: target.interface,
+                                          localAddress: target.localAddress)
+                        if result == nil { delivered = true }
+                        if round == 0 {
+                            let via = target.interface.map { "@\($0)" } ?? ""
+                            report.append("\(mac.suffix(5)) → \(target.address)\(via):\(port) \(result ?? "ok")")
+                        }
                     }
                 }
             }

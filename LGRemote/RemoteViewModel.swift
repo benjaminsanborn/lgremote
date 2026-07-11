@@ -130,9 +130,13 @@ final class RemoteViewModel: ObservableObject {
             updated.clientKey = key
             // Refresh on every connect, not just first pairing — an earlier
             // build stored the wrong interface's MAC, and the TV can also
-            // switch between Wi-Fi and Ethernet.
-            if let mac = try? await client.wakeMACAddress(), !mac.isEmpty {
-                updated.macAddress = mac
+            // switch between Wi-Fi and Ethernet. The UPnP description is the
+            // only source that reports both interfaces' MACs.
+            if let macs = await TVNetworkInfo.macAddresses(host: tv.host) {
+                updated.macAddress = macs.wifi ?? macs.wired
+                updated.secondaryMACAddress = macs.wifi == nil ? nil : macs.wired
+            } else if updated.macAddress == nil {
+                updated.macAddress = try? await client.wakeMACAddress()
             }
             if updated != tv { updateTV(updated) }
 
@@ -140,8 +144,8 @@ final class RemoteViewModel: ObservableObject {
             // if the TV isn't fully awake, turn its screen on.
             if let power = try? await client.powerState(), power != "Active" {
                 try? await client.turnOnScreen()
-                if let mac = updated.macAddress {
-                    WakeOnLAN.wake(macAddress: mac, unicastHost: updated.host)
+                if !updated.wakeMACAddresses.isEmpty {
+                    WakeOnLAN.wake(macAddresses: updated.wakeMACAddresses, unicastHost: updated.host)
                 }
             }
 
@@ -217,6 +221,9 @@ final class RemoteViewModel: ObservableObject {
             // Always send wake packets up front: with Quick Start+ the TV keeps its
             // webOS port open while the screen is off, so a reachable port does NOT
             // mean the TV is on. WoL is harmless if it already is.
+            if !tv.wakeMACAddresses.isEmpty {
+                WakeOnLAN.wake(macAddresses: tv.wakeMACAddresses, unicastHost: tv.host)
+            }
             let reachable = await TVStatusProbe.isAwake(host: tv.host)
             guard !Task.isCancelled else { return }
             awake[tv.id] = reachable
@@ -231,8 +238,8 @@ final class RemoteViewModel: ObservableObject {
             // a cheap port probe (2s timeout), and a full connect only once the
             // port answers.
             for _ in 0..<10 {
-                if let mac = tv.macAddress {
-                    WakeOnLAN.wake(macAddress: mac, unicastHost: tv.host)
+                if !tv.wakeMACAddresses.isEmpty {
+                    WakeOnLAN.wake(macAddresses: tv.wakeMACAddresses, unicastHost: tv.host)
                 }
                 if await TVStatusProbe.isAwake(host: tv.host) {
                     if Task.isCancelled { return }

@@ -7,15 +7,25 @@ public struct TVDevice: Identifiable, Codable, Hashable, Sendable {
     public var host: String
     /// Used for Wake-on-LAN power on. Auto-filled from the TV after first pairing.
     public var macAddress: String?
+    /// The TV's other network interface (e.g. Ethernet when on Wi-Fi). Wake
+    /// packets go to both so it doesn't matter which one is active.
+    public var secondaryMACAddress: String?
     /// webOS pairing key. Nil until the TV prompt has been accepted once.
     public var clientKey: String?
 
-    public init(id: UUID = UUID(), name: String, host: String, macAddress: String? = nil, clientKey: String? = nil) {
+    public init(id: UUID = UUID(), name: String, host: String, macAddress: String? = nil,
+                secondaryMACAddress: String? = nil, clientKey: String? = nil) {
         self.id = id
         self.name = name
         self.host = host
         self.macAddress = macAddress
+        self.secondaryMACAddress = secondaryMACAddress
         self.clientKey = clientKey
+    }
+
+    /// Every MAC worth sending a magic packet to.
+    public var wakeMACAddresses: [String] {
+        [macAddress, secondaryMACAddress].compactMap { $0 }
     }
 }
 
