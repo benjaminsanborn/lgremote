@@ -11,7 +11,7 @@ settings:
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Automatic
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "5"
+    CURRENT_PROJECT_VERSION: "6"
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
 
 targets:
@@ -36,6 +36,9 @@ targets:
       path: LGRemote/Info.plist
       properties:
         CFBundleDisplayName: Good Remote
+        # xcodegen writes a literal "1" otherwise, and uploads get silently
+        # auto-renumbered by manageAppVersionAndBuildNumber.
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiresFullScreen: true
