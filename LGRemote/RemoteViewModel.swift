@@ -128,8 +128,11 @@ final class RemoteViewModel: ObservableObject {
 
             var updated = tv
             updated.clientKey = key
-            if updated.macAddress == nil {
-                updated.macAddress = try? await client.deviceMACAddress()
+            // Refresh on every connect, not just first pairing — an earlier
+            // build stored the wrong interface's MAC, and the TV can also
+            // switch between Wi-Fi and Ethernet.
+            if let mac = try? await client.wakeMACAddress(), !mac.isEmpty {
+                updated.macAddress = mac
             }
             if updated != tv { updateTV(updated) }
 

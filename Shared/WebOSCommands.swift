@@ -88,8 +88,23 @@ public extension WebOSClient {
         }
     }
 
-    /// The TV reports its Wi-Fi MAC as "device_id"; we save it for Wake-on-LAN.
-    func deviceMACAddress() async throws -> String? {
+    /// The MAC address to target with Wake-on-LAN: the active network
+    /// interface's MAC from the connection manager. The software-info
+    /// "device_id" is NOT reliable for this — it can be a different
+    /// interface's MAC (e.g. Ethernet on a TV that's on Wi-Fi), and magic
+    /// packets addressed to it are silently ignored.
+    func wakeMACAddress() async throws -> String? {
+        if let payload = try? await request("ssap://com.webos.service.connectionmanager/getStatus") {
+            func section(_ key: String) -> [String: Any]? { payload[key] as? [String: Any] }
+            let wifiMAC = section("wifiInfo")?["macAddress"] as? String
+            let wiredMAC = section("wiredInfo")?["macAddress"] as? String
+            let wiredConnected = (section("wired")?["state"] as? String) == "connected"
+            let wifiConnected = (section("wifi")?["state"] as? String) == "connected"
+            if wiredConnected, let wiredMAC { return wiredMAC }
+            if wifiConnected, let wifiMAC { return wifiMAC }
+            if let mac = wifiMAC ?? wiredMAC { return mac }
+        }
+        // Last resort for firmware without getStatus MAC fields.
         let payload = try await request("ssap://com.webos.service.update/getCurrentSWInformation")
         return payload["device_id"] as? String
     }
