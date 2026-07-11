@@ -175,17 +175,31 @@ struct TVDetailView: View {
 
     var body: some View {
         Form {
-            Section("Details") {
+            Section {
                 TextField("Name", text: $tv.name)
                 TextField("IP address", text: $tv.host)
                     .keyboardType(.decimalPad)
                     .autocorrectionDisabled()
+            } header: {
+                Text("Details")
+            }
+
+            Section {
                 TextField("MAC address (for power on)", text: Binding(
                     get: { tv.macAddress ?? "" },
                     set: { tv.macAddress = $0.isEmpty ? nil : $0 }
                 ))
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.characters)
+                if let secondary = tv.secondaryMACAddress {
+                    LabeledContent("Also waking", value: secondary)
+                }
+            } header: {
+                Text("Power On")
+            } footer: {
+                Text(tv.secondaryMACAddress == nil
+                     ? "Detected automatically from the TV each time the app connects."
+                     : "Wake packets are sent to every address listed — the TV's Wi-Fi and wired interfaces have different MAC addresses, and both are detected automatically each time the app connects.")
             }
 
             Section {
