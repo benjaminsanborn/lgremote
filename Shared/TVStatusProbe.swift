@@ -3,10 +3,19 @@ import Network
 
 /// Checks whether a TV is awake by seeing if its webOS control port accepts TCP connections.
 public enum TVStatusProbe {
-    public static func isAwake(host: String, timeout: TimeInterval = 2) async -> Bool {
-        if await canConnect(host: host, port: 3001, timeout: timeout) { return true }
-        // Older firmware only listens on the plaintext port.
-        return await canConnect(host: host, port: 3000, timeout: timeout)
+    /// Probes the secure (3001) and legacy plaintext (3000) webOS ports at the
+    /// same time and returns as soon as either answers, so an off TV is
+    /// reported in one timeout rather than two sequential ones.
+    public static func isAwake(host: String, timeout: TimeInterval = 1.5) async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask { await canConnect(host: host, port: 3001, timeout: timeout) }
+            group.addTask { await canConnect(host: host, port: 3000, timeout: timeout) }
+            for await reachable in group where reachable {
+                group.cancelAll()
+                return true
+            }
+            return false
+        }
     }
 
     private static func canConnect(host: String, port: UInt16, timeout: TimeInterval) async -> Bool {

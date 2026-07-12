@@ -170,10 +170,24 @@ final class RemoteViewModel: ObservableObject {
     }
 
     func connectIfNeeded() {
-        guard selectedTV != nil else { return }
+        guard let tv = selectedTV else { return }
         switch state {
         case .disconnected:
-            connect()
+            // Don't open a WebSocket blindly — an off TV would spin in
+            // "Connecting…" for the full ~12s socket timeout. Probe first
+            // (fast); connect only if it answers, otherwise just show it off.
+            connectTask?.cancel()
+            state = .connecting
+            connectTask = Task {
+                let reachable = await TVStatusProbe.isAwake(host: tv.host)
+                guard !Task.isCancelled, state == .connecting else { return }
+                awake[tv.id] = reachable
+                if reachable {
+                    _ = await performConnect(tv)
+                } else {
+                    state = .disconnected
+                }
+            }
         case .connected:
             // The socket may have silently died while the app was suspended —
             // verify with a cheap request and reconnect if it's actually dead.
