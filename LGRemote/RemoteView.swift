@@ -67,38 +67,16 @@ struct RemoteView: View {
             }
 
             Spacer()
-
-            Button {
-                Haptics.tap()
-                if viewModel.state == .connected {
-                    viewModel.connect()
-                } else {
-                    viewModel.showPicker = true
-                }
-            } label: {
-                Image(systemName: connectionIcon)
-                    .font(.caption.bold())
-                    .foregroundStyle(connectionColor)
-                    .frame(width: 16, height: 16)
-                    .padding(8)
-                    .background(Circle().fill(.white.opacity(0.06)))
-            }
-            .buttonStyle(.plain)
         }
     }
 
-    private var connectionIcon: String {
+    /// The power button's fill reflects TV power: red when connected (on),
+    /// orange while connecting, dim when off/disconnected.
+    private var powerFill: Color {
         switch viewModel.state {
-        case .connected, .connecting, .pairing: return "antenna.radiowaves.left.and.right"
-        case .disconnected: return "antenna.radiowaves.left.and.right.slash"
-        }
-    }
-
-    private var connectionColor: Color {
-        switch viewModel.state {
-        case .connected: return .green
+        case .connected: return Color(red: 0.85, green: 0.15, blue: 0.15)
         case .connecting, .pairing: return .orange
-        case .disconnected: return .red
+        case .disconnected: return .white.opacity(0.12)
         }
     }
 
@@ -118,7 +96,7 @@ struct RemoteView: View {
 
     private var topRow: some View {
         HStack(spacing: 16) {
-            RemoteKey(icon: "power", size: 54, tint: .white, fill: Color(red: 0.85, green: 0.15, blue: 0.15)) {
+            RemoteKey(icon: "power", size: 54, tint: .white, fill: powerFill) {
                 Haptics.heavy()
                 viewModel.powerToggle()
             }
@@ -129,7 +107,7 @@ struct RemoteView: View {
                 } else {
                     ForEach(viewModel.inputs) { input in
                         Button(input.label) {
-                            viewModel.run { try await $0.switchInput(id: input.id) }
+                            viewModel.switchInput(id: input.id, label: input.label)
                         }
                     }
                 }
@@ -143,7 +121,7 @@ struct RemoteView: View {
                 } else {
                     ForEach(viewModel.apps) { app in
                         Button(app.title) {
-                            viewModel.run { try await $0.launchApp(id: app.id) }
+                            viewModel.launchApp(id: app.id, title: app.title)
                         }
                     }
                 }
@@ -160,7 +138,7 @@ struct RemoteView: View {
             .buttonStyle(KeyButtonStyle())
 
             RemoteKey(icon: "speaker.slash.fill", size: 54) {
-                viewModel.run { try await $0.toggleMute() }
+                viewModel.toggleMute()
             }
         }
     }
@@ -235,9 +213,9 @@ struct RemoteView: View {
     private var rockers: some View {
         HStack(spacing: 26) {
             Rocker(label: "VOL", topIcon: "plus", bottomIcon: "minus") {
-                viewModel.run { try await $0.volumeUp() }
+                viewModel.volumeUp()
             } bottomAction: {
-                viewModel.run { try await $0.volumeDown() }
+                viewModel.volumeDown()
             }
 
             VStack(spacing: 14) {

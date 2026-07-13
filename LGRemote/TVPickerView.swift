@@ -102,7 +102,7 @@ struct TVPickerView: View {
         switch viewModel.awake[tv.id] {
         case true: return .green
         case false: return .red
-        default: return .gray
+        default: return .gray // not yet connected / status undetermined
         }
     }
 
@@ -119,7 +119,7 @@ struct TVPickerView: View {
         switch viewModel.awake[tv.id] {
         case true: return "Ready — tap to connect"
         case false: return "Off — tap to turn on"
-        default: return "Checking status…"
+        default: return tv.clientKey == nil ? "Not paired" : "Paired" // status not yet determined
         }
     }
 }

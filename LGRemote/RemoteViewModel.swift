@@ -175,18 +175,15 @@ final class RemoteViewModel: ObservableObject {
         case .disconnected:
             // Don't open a WebSocket blindly — an off TV would spin in
             // "Connecting…" for the full ~12s socket timeout. Probe first
-            // (fast); connect only if it answers, otherwise just show it off.
+            // (fast) while staying .disconnected so the picker row shows a
+            // blank status and stays tappable (tapping wakes immediately);
+            // connect only once it answers, otherwise leave it showing off.
             connectTask?.cancel()
-            state = .connecting
             connectTask = Task {
                 let reachable = await TVStatusProbe.isAwake(host: tv.host)
-                guard !Task.isCancelled, state == .connecting else { return }
+                guard !Task.isCancelled, state == .disconnected else { return }
                 awake[tv.id] = reachable
-                if reachable {
-                    _ = await performConnect(tv)
-                } else {
-                    state = .disconnected
-                }
+                if reachable { connect() }
             }
         case .connected:
             // The socket may have silently died while the app was suspended —
@@ -294,6 +291,26 @@ final class RemoteViewModel: ObservableObject {
 
     func button(_ name: String) {
         run { try await $0.sendButton(name) }
+    }
+
+    func launchApp(id: String, title: String) {
+        run { try await $0.launchApp(id: id) }
+    }
+
+    func switchInput(id: String, label: String) {
+        run { try await $0.switchInput(id: id) }
+    }
+
+    func volumeUp() {
+        run { try await $0.volumeUp() }
+    }
+
+    func volumeDown() {
+        run { try await $0.volumeDown() }
+    }
+
+    func toggleMute() {
+        run { try await $0.toggleMute() }
     }
 
     func powerToggle() {

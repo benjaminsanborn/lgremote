@@ -23,6 +23,11 @@ struct LGRemoteApp: App {
 struct ContentView: View {
     @EnvironmentObject private var viewModel: RemoteViewModel
 
+    /// The app's display name, so alerts match the home-screen name in every build.
+    static let appName = (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+        ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)
+        ?? "TV Remote"
+
     var body: some View {
         Group {
             if viewModel.showPicker {
@@ -36,7 +41,7 @@ struct ContentView: View {
             .sheet(isPresented: $viewModel.showSetup) {
                 SetupView()
             }
-            .alert("Good Remote", isPresented: Binding(
+            .alert(Self.appName, isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
             )) {

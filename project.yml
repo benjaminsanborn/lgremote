@@ -32,10 +32,17 @@ targets:
         CODE_SIGN_ENTITLEMENTS: LGRemote/LGRemote.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        # Local/dev builds show "TV Remote"; the App Store bundle name must stay
+        # "Good Remote" because "TV Remote" is already taken (ITMS-90129).
+        Debug:
+          APP_DISPLAY_NAME: TV Remote
+        Release:
+          APP_DISPLAY_NAME: Good Remote
     info:
       path: LGRemote/Info.plist
       properties:
-        CFBundleDisplayName: Good Remote
+        CFBundleDisplayName: $(APP_DISPLAY_NAME)
         # xcodegen writes a literal "1" otherwise, and uploads get silently
         # auto-renumbered by manageAppVersionAndBuildNumber.
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
