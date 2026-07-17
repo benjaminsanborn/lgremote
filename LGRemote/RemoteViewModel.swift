@@ -140,6 +140,9 @@ final class RemoteViewModel: ObservableObject {
             }
             if updated != tv { updateTV(updated) }
 
+            // Surface transport/volume controls on the Lock Screen while connected.
+            TVLiveActivity.start(tv: updated)
+
             // Quick Start+ standby accepts connections with the panel off —
             // if the TV isn't fully awake, turn its screen on.
             if let power = try? await client.powerState(), power != "Active" {
@@ -322,6 +325,7 @@ final class RemoteViewModel: ObservableObject {
                     await client.disconnect()
                     state = .disconnected
                     awake[tv.id] = false
+                    TVLiveActivity.end()
                     return
                 } catch {
                     // Fall through and try waking instead.
