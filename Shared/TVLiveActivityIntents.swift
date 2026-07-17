@@ -32,6 +32,23 @@ actor TVQuickControl {
 // LiveActivityIntent runs in the app's process (woken as needed) rather than the
 // widget extension, and is App Store-sanctioned for Live Activity buttons.
 
+/// Sends a pointer-socket button (UP/DOWN/LEFT/RIGHT/ENTER/HOME/BACK/…).
+public struct TVButtonIntent: LiveActivityIntent {
+    public static var title: LocalizedStringResource = "Remote Button"
+    @Parameter(title: "Host") public var host: String
+    @Parameter(title: "Key") public var clientKey: String?
+    @Parameter(title: "Button") public var button: String
+    public init() {}
+    public init(host: String, clientKey: String?, button: String) {
+        self.host = host; self.clientKey = clientKey; self.button = button
+    }
+    public func perform() async throws -> some IntentResult {
+        let name = button
+        await TVQuickControl.shared.perform(host: host, clientKey: clientKey) { try await $0.sendButton(name) }
+        return .result()
+    }
+}
+
 public struct TVPlayIntent: LiveActivityIntent {
     public static var title: LocalizedStringResource = "Play"
     @Parameter(title: "Host") public var host: String
