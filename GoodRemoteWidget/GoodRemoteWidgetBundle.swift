@@ -46,23 +46,27 @@ struct TVLiveActivity: Widget {
         }
     }
 
-    // 3×3 control cluster: d-pad cross in the center, Home/Back on top, volume on the bottom.
+    // Volume stacked on the left, Home/Back in the middle, d-pad cross on the right.
     private func pad(_ tv: TVActivityAttributes, size: CGFloat) -> some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 6) {
+        HStack(spacing: 4) {
+            VStack(spacing: 8) {
+                iconButton("speaker.wave.3.fill", TVVolumeUpIntent(host: tv.host, clientKey: tv.clientKey), size)
+                iconButton("speaker.wave.1.fill", TVVolumeDownIntent(host: tv.host, clientKey: tv.clientKey), size)
+            }
+            Spacer(minLength: 8)
+            VStack(spacing: 8) {
                 iconButton("house.fill", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "HOME"), size)
-                iconButton("chevron.up", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "UP"), size)
                 iconButton("arrow.uturn.backward", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "BACK"), size)
             }
-            HStack(spacing: 6) {
-                iconButton("chevron.left", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "LEFT"), size)
-                okButton(TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "ENTER"), size)
-                iconButton("chevron.right", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "RIGHT"), size)
-            }
-            HStack(spacing: 6) {
-                iconButton("speaker.wave.1.fill", TVVolumeDownIntent(host: tv.host, clientKey: tv.clientKey), size)
+            Spacer(minLength: 8)
+            VStack(spacing: 6) {
+                iconButton("chevron.up", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "UP"), size)
+                HStack(spacing: 6) {
+                    iconButton("chevron.left", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "LEFT"), size)
+                    okButton(TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "ENTER"), size)
+                    iconButton("chevron.right", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "RIGHT"), size)
+                }
                 iconButton("chevron.down", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "DOWN"), size)
-                iconButton("speaker.wave.3.fill", TVVolumeUpIntent(host: tv.host, clientKey: tv.clientKey), size)
             }
         }
     }
