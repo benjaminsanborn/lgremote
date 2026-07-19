@@ -13,18 +13,12 @@ struct GoodRemoteWidgetBundle: WidgetBundle {
 struct TVLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: TVActivityAttributes.self) { context in
-            // Lock Screen / banner
-            VStack(spacing: 6) {
-                Label(context.attributes.tvName, systemImage: "tv")
-                    .font(.caption.bold())
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                pad(context.attributes, size: 34)
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .activityBackgroundTint(Color.black.opacity(0.6))
-            .activitySystemActionForegroundColor(.white)
+            // Lock Screen / banner — a single row: Vol−, Vol+, Back, OK.
+            lockRow(context.attributes, size: 46)
+                .padding(.vertical, 14)
+                .padding(.horizontal, 18)
+                .activityBackgroundTint(Color.black.opacity(0.6))
+                .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -43,6 +37,16 @@ struct TVLiveActivity: Widget {
             } minimal: {
                 Image(systemName: "tv")
             }
+        }
+    }
+
+    // Simple single row for the Lock Screen: Vol−, Vol+, Back, OK.
+    private func lockRow(_ tv: TVActivityAttributes, size: CGFloat) -> some View {
+        HStack(spacing: 14) {
+            iconButton("speaker.wave.1.fill", TVVolumeDownIntent(host: tv.host, clientKey: tv.clientKey), size)
+            iconButton("speaker.wave.3.fill", TVVolumeUpIntent(host: tv.host, clientKey: tv.clientKey), size)
+            iconButton("arrow.uturn.backward", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "BACK"), size)
+            okButton(TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "ENTER"), size)
         }
     }
 
