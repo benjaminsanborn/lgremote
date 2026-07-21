@@ -13,12 +13,18 @@ struct GoodRemoteWidgetBundle: WidgetBundle {
 struct TVLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: TVActivityAttributes.self) { context in
-            // Lock Screen / banner — a single row: Vol−, Vol+, Back, OK.
-            lockRow(context.attributes, size: 46)
-                .padding(.vertical, 14)
-                .padding(.horizontal, 18)
-                .activityBackgroundTint(Color.black.opacity(0.6))
-                .activitySystemActionForegroundColor(.white)
+            // Lock Screen / banner — TV title + Vol−, Vol+, Pause, Play.
+            VStack(spacing: 10) {
+                Label(context.attributes.tvName, systemImage: "tv")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                lockRow(context.attributes, size: 46)
+            }
+            .padding(.vertical, 14)
+            .padding(.horizontal, 18)
+            .activityBackgroundTint(Color.black.opacity(0.6))
+            .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -40,13 +46,13 @@ struct TVLiveActivity: Widget {
         }
     }
 
-    // Simple single row for the Lock Screen: Vol−, Vol+, Back, OK.
+    // Simple single row for the Lock Screen: Vol−, Vol+, Pause, Play.
     private func lockRow(_ tv: TVActivityAttributes, size: CGFloat) -> some View {
         HStack(spacing: 14) {
             iconButton("speaker.wave.1.fill", TVVolumeDownIntent(host: tv.host, clientKey: tv.clientKey), size)
             iconButton("speaker.wave.3.fill", TVVolumeUpIntent(host: tv.host, clientKey: tv.clientKey), size)
-            iconButton("arrow.uturn.backward", TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "BACK"), size)
-            okButton(TVButtonIntent(host: tv.host, clientKey: tv.clientKey, button: "ENTER"), size)
+            iconButton("pause.fill", TVPauseIntent(host: tv.host, clientKey: tv.clientKey), size)
+            iconButton("play.fill", TVPlayIntent(host: tv.host, clientKey: tv.clientKey), size)
         }
     }
 
